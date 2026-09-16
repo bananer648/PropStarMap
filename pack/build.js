@@ -29,7 +29,7 @@ function rmrf(p) { fs.rmSync(p, { recursive: true, force: true }); }
 log("== 1/5 复制站点文件 ==");
 rmrf(SITE);
 fs.mkdirSync(SITE, { recursive: true });
-const SKIP = new Set(["pack", "site"]);
+const SKIP = new Set(["pack", "site", ".git"]);   // .git 绝不进站点
 for (const d of fs.readdirSync(ROOT, { withFileTypes: true })) {
   if (d.isDirectory() && !SKIP.has(d.name)) {
     fs.cpSync(path.join(ROOT, d.name), path.join(SITE, d.name), { recursive: true });
