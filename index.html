@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<!-- Bananer：i ❤ CQU -->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>命题星图 · 数学命题关系图谱</title>
+<link rel="stylesheet" href="lib/katex.min.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>命题星图 · 数学命题关系图谱</h1>
+    <span id="view-label" style="font-size:12.5px;color:var(--muted);">视图：拓扑学</span>
+    <button id="btn-focus-off" style="display:none;">✕ 取消聚焦</button>
+    <div class="spacer"></div>
+    <div class="ctrl-group">
+      <span id="subj-toggles"></span>
+      <button id="btn-layout-toggle" title="切换星云图 / 逻辑图">🧠 逻辑图</button>
+      <button id="btn-manage-custom" title="管理自己手动建立的连接（灰色虚线）：悬停高亮、可删除">🔗 我的连接 <span id="custom-count">0</span></button>
+      <button id="btn-import-node" title="导入自己的命题/定义/定理（单个或批量），生成新的球">＋ 导入节点</button>
+      <input class="search-box" id="search" type="text" placeholder="搜索节点（如 P2 / 同胚）">
+    </div>
+    <div class="ctrl-group">
+      <label class="chip" title="等比缩放所有球之间的距离（重新布局后回到 1.00×）">
+        <span style="font-size:12.5px;">间距</span>
+        <input type="range" id="layout-scale" min="1" max="3" step="0.01" value="1">
+        <span id="scale-val">1.00×</span>
+      </label>
+      <button id="btn-label-mode" title="切换球上标注：仅编号 / 编号+短名 / 隐藏">🔢 标注：仅编号</button>
+      <button id="btn-reset-num" title="清除全部自定义编号，恢复教材顺序初始编号">↩ 恢复初始编号</button>
+      <label class="chip" id="chip-def"><input type="checkbox" id="toggle-def" checked> 定义</label>
+      <label class="chip" id="chip-ex"><input type="checkbox" id="toggle-ex" checked> 特例</label>
+      <label class="chip" id="chip-user" title="手动导入的命题/定义/定理（暖橙色球）"><input type="checkbox" id="toggle-user" checked> 我的节点</label>
+      <label class="chip" id="chip-aux"><input type="checkbox" id="toggle-aux"> 证明依赖</label>
+      <label class="chip"><input type="checkbox" id="toggle-equiv" checked> <span style="color:var(--equiv)">⇔ 等价</span></label>
+      <label class="chip"><input type="checkbox" id="toggle-impl" checked> <span style="color:var(--impl)">⇒ 推论</span></label>
+      <label class="chip"><input type="checkbox" id="toggle-joint" checked> <span style="color:var(--joint)">⇢ 联合</span></label>
+      <label class="chip" title="自己手动建立的灰色虚线连接"><input type="checkbox" id="toggle-custom" checked> <span style="color:#9aa0ad">╌ 我的连接</span></label>
+    </div>
+  </header>
+
+  <div id="main">
+    <div id="cy-wrap">
+      <div id="cy"></div>
+      <div id="legend">
+        <div style="font-weight:600;margin-bottom:4px;color:var(--accent);">图例</div>
+        <div class="lg-row"><span class="lg-line" style="background:var(--equiv);"></span> 等价（双向）</div>
+        <div class="lg-row"><span class="lg-line" style="background:var(--impl);"></span> 推论（单向）</div>
+        <div class="lg-row"><span class="lg-line" style="background:var(--joint);border-top:2px dashed var(--joint);height:0;"></span> 联合蕴含（AND 门）</div>
+        <div class="lg-row"><span class="lg-line" style="background:var(--aux);"></span> 证明依赖（辅助）</div>
+        <div class="lg-row"><span class="lg-line" style="background:#9aa0ad;border-top:2px dashed #9aa0ad;height:0;"></span> 我的连接（手动添加）</div>
+        <div class="lg-row"><span class="lg-dot" style="background:var(--prop);color:var(--prop);"></span> 命题 / 定理</div>
+        <div class="lg-row"><span class="lg-dot" style="background:var(--def);color:var(--def);"></span> 定义</div>
+        <div class="lg-row"><span class="lg-dot" style="background:var(--ex);color:var(--ex);"></span> 特例 / 条件</div>
+      </div>
+      <div id="hint">单击节点 → 侧栏详情 · 双击 → 新窗口详情页 · 右键节点 → 单球缩放 / 撤销 · 右键空白 → 重新布局</div>
+    </div>
+
+    <aside id="panel">
+      <div class="empty">点击图中任意节点查看详情</div>
+    </aside>
+  </div>
+
+  <!-- 导入节点弹窗（单个 / 批量） -->
+  <div id="import-modal" class="modal-mask hidden">
+    <div class="modal-box">
+      <div class="modal-head">
+        <span style="font-weight:600;">＋ 导入节点</span>
+        <button id="import-close" class="plain-btn" title="关闭">✕</button>
+      </div>
+      <div class="modal-tabs">
+        <button id="tab-single" class="modal-tab on">单个导入</button>
+        <button id="tab-batch" class="modal-tab">批量导入（JSON）</button>
+      </div>
+
+      <!-- 单个导入表单 -->
+      <div id="import-single" class="import-pane">
+        <label class="f-label">类型
+          <select id="imp-kind">
+            <option value="theorem">定理（manual 编号，暖橙球）</option>
+          </select>
+        </label>
+        <label class="f-label">归属学科
+          <select id="imp-subject">
+            <option value="user">我的节点（通用分组）</option>
+          </select>
+        </label>
+        <label class="f-label">短名（图上显示，必填）
+          <input id="imp-label" type="text" placeholder="如：一致收敛定理">
+        </label>
+        <label class="f-label">标题（详情页标题，可选）
+          <input id="imp-title" type="text" placeholder="如：定理 7.1 一致收敛与连续性">
+        </label>
+        <label class="f-label">陈述（支持 $...$ / $$...$$ 公式，必填）
+          <textarea id="imp-statement" rows="4" placeholder="如：设 $f_n ightarrow f$ 一致收敛，且每个 $f_n$ 连续，则 $f$ 连续。"></textarea>
+        </label>
+        <label class="f-label">证明（可选，支持公式）
+          <textarea id="imp-proof" rows="3" placeholder="自己的证明过程，或证明位置"></textarea>
+        </label>
+        <label class="f-label">出处 / 备注（可选）
+          <input id="imp-ref" type="text" placeholder="如：教材 §7.1 / 习题课">
+        </label>
+        <div class="modal-foot">
+          <span id="import-msg" class="import-msg"></span>
+          <button id="imp-submit" class="btn primary">生成新球</button>
+        </div>
+      </div>
+
+      <!-- 批量导入表单 -->
+      <div id="import-batch" class="import-pane hidden">
+        <label class="f-label">归属学科（未在 JSON 中指定 subjectId 时生效）
+          <select id="imp-batch-subject">
+            <option value="user">我的节点（通用分组）</option>
+          </select>
+        </label>
+        <div class="f-label" style="margin-bottom:6px;">粘贴 JSON 数组（格式见下）</div>
+        <textarea id="imp-batch-json" rows="8" placeholder='[
+  {
+    "label": "一致收敛定理",
+    "title": "定理 7.1 一致收敛与连续性",
+    "statement": "设 $f_n \Rightarrow f$ 一致收敛，且每个 $f_n$ 连续，则 $f$ 连续。",
+    "proof": "用 $\\varepsilon/3$ 法。",
+    "ref": "教材 §7.1"
+  },
+  { "label": "另一个定理", "statement": "……" }
+]'></textarea>
+        <div class="import-hint">
+          规范字段：<code>label</code>（短名，必填）、<code>statement</code>（陈述，必填）、
+          <code>title</code>、<code>proof</code>、<code>ref</code>（可选）。
+          id 由系统自动生成（不会与教材节点冲突）。
+        </div>
+        <div class="modal-foot">
+          <span id="import-msg2" class="import-msg"></span>
+          <button id="imp-batch-submit" class="btn primary">批量生成</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 我的连接管理面板（手动建立的灰色虚线边） -->
+  <div id="custom-mgr" class="custom-mgr hidden">
+    <div class="custom-mgr-head">
+      <span style="font-weight:600;">🔗 我的连接</span>
+      <span style="font-size:12px;color:var(--muted);">悬停条目会在图上高亮对应虚线</span>
+      <button id="custom-mgr-close" class="plain-btn" title="关闭">✕</button>
+    </div>
+    <div id="custom-mgr-list" class="custom-mgr-list"></div>
+    <div id="custom-mgr-empty" class="custom-mgr-empty" style="display:none;">还没有手动建立的连接。右键球 →「🔗 连接另一个球」即可建立。</div>
+    <div class="custom-mgr-foot">
+      <button id="custom-mgr-clear" class="plain-btn danger-text">清空全部连接</button>
+    </div>
+  </div>
+</div>
+
+<!-- 依赖库 -->
+<script src="lib/cytoscape.min.js"></script>
+<script src="lib/dagre.min.js"></script>
+<script src="lib/cytoscape-dagre.js"></script>
+<script src="lib/cose-base.js"></script>
+<script src="lib/cytoscape-fcose.js"></script>
+<script src="lib/katex.min.js"></script>
+<script src="lib/auto-render.min.js"></script>
+<!-- 数据 -->
+<script src="data/manifest.js"></script>
+<script src="data/topology.js"></script>
+<script src="data/analysis.js"></script>
+<script src="data/algebra.js"></script>
+<!-- 笔记存储（详情页笔记与主图徽标共享） -->
+<script src="js/notes-store.js"></script>
+<!-- 应用 -->
+<script src="js/app.js"></script>
+</body>
+</html>

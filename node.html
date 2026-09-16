@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>命题星图 · 节点详情</title>
+<link rel="stylesheet" href="lib/katex.min.css">
+<link rel="stylesheet" href="css/style.css">
+<style>
+  /* 详情页专用（纯白主题与主图一致） */
+  body {
+    background: #ffffff;
+    padding: 24px;
+    color: var(--text);
+  }
+  #page { max-width: 860px; margin: 0 auto; }
+  .card {
+    background: #ffffff;
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 20px 24px; margin-bottom: 16px;
+  }
+  h1 { font-size: 20px; margin-bottom: 8px; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; color: #fff; font-weight: 600; margin-right: 8px; }
+  .badge.definition { background: #c9a227; }
+  .badge.example { background: #9a5ec9; }
+  .badge.proposition { background: #2b6fb8; }
+  .badge.theorem { background: #d98a1f; }
+  .meta { color: var(--muted); font-size: 13px; margin: 6px 0 12px; }
+  .sec-title { font-weight: 600; margin: 16px 0 8px; color: #39424e; letter-spacing: 0.5px; }
+  .statement { background: #f8f9fb; border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; line-height: 1.7; }
+  .proof { border-left: 3px solid var(--impl); background: #f2faf5; padding: 10px 14px; border-radius: 0 8px 8px 0; }
+  a.node-link { color: #1a5fb4; text-decoration: none; }
+  a.node-link:hover { text-decoration: underline; }
+  #mini-wrap { width: 100%; height: 300px; border: 1px solid var(--border); border-radius: 8px; background: #ffffff; }
+  .actions { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .actions .btn { display: inline-flex; align-items: center; text-decoration: none; }
+  .back { position: fixed; top: 14px; left: 14px; }
+  .katex { color: #1c2733; }
+  /* ---------- 笔记功能栏 ---------- */
+  #notes-card { display: none; }
+  #notes-card.show { display: block; }
+  .notes-toolbar {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 12px;
+  }
+  .notes-toolbar .btn {
+    font: inherit; font-size: 13px;
+    border: 1px solid var(--border); background: #ffffff; color: var(--text);
+    padding: 5px 12px; border-radius: 6px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 5px; text-decoration: none;
+  }
+  .notes-toolbar .btn:hover { background: #f0f2f6; border-color: var(--border-strong); }
+  .notes-toolbar .btn.primary { background: #1a5fb4; color: #fff; border-color: #1a5fb4; }
+  .notes-toolbar .btn.primary:hover { background: #154d92; }
+  .notes-toolbar .btn.plain { border-color: transparent; background: transparent; }
+  .notes-toolbar .btn.plain:hover { background: #f0f2f6; }
+  .notes-toolbar .hint { font-size: 12px; color: var(--muted); margin-left: auto; }
+  .notes-stats { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  #note-text {
+    width: 100%; min-height: 220px; resize: vertical;
+    border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
+    font: 14px/1.7 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    color: var(--text); background: #fbfcfe; outline: none;
+  }
+  #note-text:focus { border-color: #7fb1e8; background: #ffffff; }
+  #note-preview {
+    display: none; border: 1px solid var(--border); border-radius: 8px;
+    background: #f8f9fb; padding: 10px 14px; line-height: 1.7; color: var(--text);
+  }
+  #note-preview.show { display: block; }
+  #note-preview .preview-raw { font-family: Consolas, monospace; font-size: 13px; white-space: pre-wrap; }
+  #note-preview .latex-error { color: #c01c28; background: #fdf0f1; border-radius: 4px; padding: 2px 6px; }
+  .note-img-row { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+  .note-img-thumb {
+    max-width: 240px; max-height: 160px; cursor: zoom-in;
+    border: 1px solid var(--border); border-radius: 6px; background: #fff;
+  }
+  .note-img-name { font-size: 12px; color: var(--muted); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .note-img-del {
+    border: 1px solid var(--border); background: #ffffff; color: #c01c28;
+    border-radius: 6px; padding: 2px 10px; cursor: pointer; font-size: 12px;
+  }
+  .note-img-del:hover { background: #fdf0f1; border-color: #c01c28; }
+  #notes-status { font-size: 12.5px; margin-left: 6px; }
+  #notes-status.ok { color: #26a269; }
+  #notes-status.err { color: #c01c28; }
+  #notes-status.saving { color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="page">
+  <div class="card" id="main-card">加载中…</div>
+  <div class="card">
+    <div class="sec-title" style="margin-top:0;">🧭 在关系网中的位置（局部视图，可点击跳转）</div>
+    <div id="mini-wrap"></div>
+  </div>
+  <div class="card" id="notes-card">
+    <div class="sec-title" style="margin-top:0;">📝 我的证明笔记</div>
+    <div class="notes-toolbar">
+      <button class="btn" id="btn-add-img" type="button">🖼 粘贴/插入图片</button>
+      <button class="btn" id="btn-paste-img" type="button">📋 从剪贴板粘贴图片</button>
+      <button class="btn" id="btn-latex-preview" type="button">🔍 LaTeX 预览</button>
+      <button class="btn" id="btn-save" type="button">💾 保存</button>
+      <button class="btn plain" id="btn-clear" type="button">🗑 清空本页笔记</button>
+      <span class="hint">$...$ 与 $$...$$ 会在预览中渲染为公式</span>
+    </div>
+    <div id="notes-tools2">
+      <button class="btn" id="btn-export-one" type="button">⤓ 导出本页 .json</button>
+      <button class="btn" id="btn-export-all" type="button">⤓ 导出全部笔记</button>
+      <button class="btn" id="btn-import" type="button">⤒ 导入笔记 .json</button>
+      <input type="file" id="import-file" accept=".json,application/json" style="display:none">
+    </div>
+    <div class="notes-stats" id="notes-stats"></div>
+    <textarea id="note-text" placeholder="在这里粘贴文字：自己的证明过程、证明思路、容易忘的细节……（支持 $...$ / $$...$$ 数学公式，点「LaTeX 预览」查看渲染效果）"></textarea>
+    <div id="note-preview"></div>
+    <div id="note-images"></div>
+    <span id="notes-status"></span>
+  </div>
+</div>
+
+<script src="lib/cytoscape.min.js"></script>
+<script src="lib/dagre.min.js"></script>
+<script src="lib/cytoscape-dagre.js"></script>
+<script src="lib/katex.min.js"></script>
+<script src="lib/auto-render.min.js"></script>
+<script src="data/manifest.js"></script>
+<script src="data/topology.js"></script>
+<script src="data/analysis.js"></script>
+<script src="data/algebra.js"></script>
+<script src="js/notes-store.js"></script>
+<script>
+(function () {
+  "use strict";
+  var params = new URLSearchParams(window.location.search);
+  var nodeId = params.get("id");
+
+  // 收集数据（与主页面相同逻辑）
+  var subjects = {};
+  var allNodes = {};
+  var allEdges = [];
+  var allJoints = [];
+  var nodeIdsBySubject = {};
+  (window.__KG_REGISTRY || []).forEach(function (data) {
+    var s = data.subject;
+    subjects[s.id] = s;
+    nodeIdsBySubject[s.id] = [];
+    (data.nodes || []).forEach(function (n) {
+      allNodes[n.id] = Object.assign({}, n, { subjectId: s.id });
+      nodeIdsBySubject[s.id].push(n.id);
+    });
+    (data.edges || []).forEach(function (e) { allEdges.push(Object.assign({}, e, { subjectId: s.id })); });
+    (data.joints || []).forEach(function (j) { allJoints.push(Object.assign({}, j, { subjectId: s.id })); });
+  });
+  // 手动导入的节点（与主图一致，存 localStorage）
+  var userNodesOrder = [];
+  try {
+    var userObj = JSON.parse(localStorage.getItem("kg-user-nodes-v1") || "null");
+    if (userObj && Array.isArray(userObj.nodes)) {
+      userObj.nodes.forEach(function (un) {
+        if (un && un.id && !allNodes[un.id]) {
+          allNodes[un.id] = Object.assign({}, un, { subjectId: "user" });
+          userNodesOrder.push(un.id);
+        }
+      });
+    }
+  } catch (e) { /* 忽略损坏数据 */ }
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function kindName(k) { return { definition: "定义", example: "特例", proposition: "命题 / 引理", theorem: "手动导入定理", gate: "联合门" }[k] || k; }
+
+  // ---------- 主卡片 ----------
+  var n = allNodes[nodeId];
+  var card = document.getElementById("main-card");
+  if (!n) {
+    card.innerHTML = "<h1>未找到节点</h1><p>id=" + esc(nodeId) + " 不存在于当前数据。可回到主图页查看。</p>";
+  } else {
+    var subj = subjects[n.subjectId] || (n.subjectId === "user" ? { label: "我的节点", color: "#d98a1f" } : {});
+    // 计算该节点在主图中的统一编号（教材节点按页码排序，手动节点追加其后）
+    var numText = "";
+    try {
+      var entries = [];
+      var userEntries = [];
+      Object.keys(allNodes).forEach(function (id, idx) {
+        var nn = allNodes[id];
+        if (nn.kind === "theorem") userEntries.push(id);
+        else entries.push({ id: id, page: (typeof nn.page === "number") ? nn.page : Infinity, idx: idx });
+      });
+      entries.sort(function (a, b) { return (a.page - b.page) || (a.idx - b.idx); });
+      var foundNum = null;
+      for (var ei = 0; ei < entries.length; ei++) {
+        if (entries[ei].id === nodeId) { foundNum = ei + 1; break; }
+      }
+      if (foundNum === null) {
+        for (var ui = 0; ui < userEntries.length; ui++) {
+          if (userEntries[ui] === nodeId) { foundNum = entries.length + ui + 1; break; }
+        }
+      }
+      if (foundNum !== null) numText = "图内编号：" + foundNum + " · ";
+    } catch (e) { }
+    var html = "";
+    html += '<span class="badge ' + esc(n.kind) + '">' + kindName(n.kind) + "</span>";
+    if (subj.label) html += '<span class="badge" style="background:' + esc(subj.color) + '">' + esc(subj.label) + "</span>";
+    html += "<h1>" + esc(n.title || n.label) + "</h1>";
+    html += '<div class="meta">';
+    if (numText) html += numText;
+    if (n.ref) html += "原书编号：" + esc(n.ref) + " · ";
+    if (n.page) html += "印刷 p." + n.page + "（PDF 第 " + (n.pdfPage || "") + " 页） · ";
+    if (n.note) html += esc(n.note) + " · ";
+    html += 'id: <code>' + esc(n.id) + "</code></div>";
+    if (n.statement) html += '<div class="sec-title">陈述</div><div class="statement" id="stmt-box"></div>';
+    if (n.proof) html += '<div class="sec-title">证明</div><div class="proof" id="proof-box"></div>';
+
+    // 关系列表
+    var rels = [];
+    allEdges.forEach(function (e) {
+      var typeName = { equiv: "等价", impl: "推论", joint: "联合", aux: "证明依赖" }[e.type] || e.type;
+      if (e.source === nodeId) rels.push({ other: e.target, type: e.type, name: typeName, label: e.label });
+      if (e.target === nodeId) rels.push({ other: e.source, type: e.type, name: typeName, label: e.label });
+    });
+    allJoints.forEach(function (j) {
+      if (j.target === nodeId) {
+        j.sources.forEach(function (s) { rels.push({ other: s, type: "joint", name: "联合推出", label: j.label }); });
+      }
+      if (j.sources.indexOf(nodeId) >= 0) rels.push({ other: j.target, type: "joint", name: "联合推出", label: j.label });
+    });
+    if (rels.length) {
+      html += '<div class="sec-title">与其他命题 / 定义的关系（' + rels.length + " 条）</div><ul>";
+      rels.forEach(function (r) {
+        var on = allNodes[r.other];
+        html += "<li>[" + esc(r.name) + "] <a class='node-link' href='node.html?id=" + encodeURIComponent(r.other) + "'>" + esc(on ? (on.title || on.label) : r.other) + "</a>" +
+          (r.label ? " <span style='color:var(--muted)'>（" + esc(r.label) + "）</span>" : "") + "</li>";
+      });
+      html += "</ul>";
+    }
+    // 联合门
+    var gates = allJoints.filter(function (j) { return j.target === nodeId || j.sources.indexOf(nodeId) >= 0; });
+    if (gates.length) {
+      html += '<div class="sec-title">参与的联合蕴含</div><ul>';
+      gates.forEach(function (j) {
+        var sns = j.sources.map(function (s) { var sn = allNodes[s]; return esc(sn ? (sn.title || sn.label) : s); }).join(" + ");
+        var tn = allNodes[j.target];
+        html += "<li>" + sns + " <b>⟹</b> " + esc(tn ? (tn.title || tn.label) : j.target) +
+          (j.ref ? " <span style='color:var(--muted)'>（" + esc(j.ref) + "）</span>" : "") + "</li>";
+      });
+      html += "</ul>";
+    }
+    html += '<div class="actions">';
+    if (n.pdfUrl) html += '<a class="btn" style="text-decoration:none;" target="_blank" rel="noopener" href="' + esc(n.pdfUrl) + '">📄 打开原书 PDF 对应页</a>';
+    html += '<a class="btn" style="text-decoration:none;" href="index.html" target="_blank" rel="noopener">🔙 回到关系网主图</a>';
+    html += "</div>";
+    card.innerHTML = html;
+
+    // 陈述与证明用 textContent 写入（保留 LaTeX 原文，避免 < 被转义破坏 KaTeX）
+    var box = document.getElementById("stmt-box");
+    if (box) {
+      box.textContent = n.statement;
+      if (window.renderMathInElement) {
+        try {
+          renderMathInElement(box, {
+            delimiters: [
+              { left: "$$", right: "$$", display: true },
+              { left: "$", right: "$", display: false }
+            ],
+            throwOnError: false
+          });
+        } catch (e) { }
+      }
+    }
+    var pbox = document.getElementById("proof-box");
+    if (pbox) pbox.textContent = n.proof;
+  }
+
+  // ---------- 局部关系网小图 ----------
+  if (n) {
+    var cy = cytoscape({
+      container: document.getElementById("mini-wrap"),
+      elements: [],
+      layout: { name: "preset" },
+      style: [
+        { selector: "node", style: { label: "data(label)", "font-size": 10, "text-valign": "center", "text-halign": "center", width: 46, height: 46, shape: "ellipse", "background-color": "#3fb9ff", "border-width": 1.5, "border-color": "#2b6fb8", "text-wrap": "wrap", "text-max-width": "46px", color: "#1c2733" } },
+        { selector: "node[kind='definition']", style: { "background-color": "#f2c94c", "border-color": "#c9a227" } },
+        { selector: "node[kind='example']", style: { "background-color": "#c77dff", "border-color": "#9a5ec9" } },
+        { selector: "node[kind='proposition']", style: { "background-color": "#3fb9ff", "border-color": "#2b6fb8" } },
+        { selector: "node[kind='theorem']", style: { "background-color": "#ffb84d", "border-color": "#d98a1f" } },
+        { selector: "node[kind='gate']", style: { shape: "diamond", width: 28, height: 28, "background-color": "#c01c28", "border-color": "#8f1620", label: "∧", "font-size": 13, color: "#ffffff" } },
+        { selector: "node.CENTER", style: { "border-width": 3, "border-color": "#e01b24", width: 52, height: 52 } },
+        { selector: "edge", style: { width: 1.8, "curve-style": "bezier", "target-arrow-shape": "triangle", "line-color": "#26a269", "target-arrow-color": "#26a269" } },
+        { selector: "edge[type='equiv']", style: { "target-arrow-shape": "triangle-tee", "source-arrow-shape": "triangle-tee", "line-color": "#1a5fb4", "target-arrow-color": "#1a5fb4", "source-arrow-color": "#1a5fb4" } },
+        { selector: "edge[type='joint']", style: { "line-color": "#c01c28", "line-style": "dashed", "target-arrow-color": "#c01c28" } },
+        { selector: "edge[type='aux']", style: { "line-color": "#8f96ad", "line-style": "dotted", "target-arrow-color": "#8f96ad", width: 1.2 } }
+      ],
+      wheelSensitivity: 0.2
+    });
+
+    var center = allNodes[nodeId];
+    cy.add({ group: "nodes", data: { id: nodeId, label: center.label, kind: center.kind } });
+    cy.getElementById(nodeId).addClass("CENTER");
+    var seen = {};
+
+    function addNeighbor(id) {
+      if (seen[id] || !allNodes[id]) return;
+      seen[id] = true;
+      var nn = allNodes[id];
+      cy.add({ group: "nodes", data: { id: id, label: nn.label, kind: nn.kind } });
+    }
+    // 一度邻居
+    allEdges.forEach(function (e) {
+      if (e.source === nodeId) { addNeighbor(e.target); }
+      if (e.target === nodeId) { addNeighbor(e.source); }
+    });
+    allJoints.forEach(function (j) {
+      if (j.sources.indexOf(nodeId) >= 0) { addNeighbor(j.target); }
+      if (j.target === nodeId) { j.sources.forEach(addNeighbor); }
+    });
+    // 边
+    allEdges.forEach(function (e) {
+      if (seen[e.source] || e.source === nodeId) {
+        if (seen[e.target] || e.target === nodeId) {
+          cy.add({ group: "edges", data: { id: "m:" + e.id, source: e.source, target: e.target, type: e.type } });
+        }
+      }
+    });
+    allJoints.forEach(function (j) {
+      if (j.target === nodeId || j.sources.indexOf(nodeId) >= 0) {
+        var gid = "m:" + j.id + ":gate";
+        cy.add({ group: "nodes", data: { id: gid, label: "∧", kind: "gate" } });
+        j.sources.forEach(function (s) {
+          if (seen[s] || s === nodeId) cy.add({ group: "edges", data: { id: "m:" + j.id + ":in:" + s, source: s, target: gid, type: "joint" } });
+        });
+        cy.add({ group: "edges", data: { id: "m:" + j.id + ":out", source: gid, target: j.target, type: "joint" } });
+      }
+    });
+    cy.layout({ name: "dagre", rankDir: "LR", nodeSep: 22, rankSep: 70, animate: false }).run();
+    cy.fit(undefined, 40);
+    cy.on("tap", "node", function (evt) {
+      var id = evt.target.id();
+      if (evt.target.data("kind") === "gate") return;
+      window.location.href = "node.html?id=" + encodeURIComponent(id);
+    });
+  }
+})();
+</script>
+
+<script>
+// ================= 我的证明笔记（功能栏） =================
+(function () {
+  "use strict";
+  var nodeId = new URLSearchParams(window.location.search).get("id");
+  var notesCard = document.getElementById("notes-card");
+  if (!nodeId || !window.KGNotes) return;
+  notesCard.classList.add("show");
+
+  var DB_LIMIT = 4.5 * 1024 * 1024;   // 单条笔记 JSON 大小上限（接近 localStorage 5MB 配额）
+  var IMG_MAX = 4096;                 // 单张图片最长边像素（超限自动缩放）
+
+  var el = {
+    text: document.getElementById("note-text"),
+    preview: document.getElementById("note-preview"),
+    images: document.getElementById("note-images"),
+    status: document.getElementById("notes-status"),
+    stats: document.getElementById("notes-stats"),
+    addImg: document.getElementById("btn-add-img"),
+    pasteImg: document.getElementById("btn-paste-img"),
+    latexPreview: document.getElementById("btn-latex-preview"),
+    save: document.getElementById("btn-save"),
+    clear: document.getElementById("btn-clear"),
+    exportOne: document.getElementById("btn-export-one"),
+    exportAll: document.getElementById("btn-export-all"),
+    importBtn: document.getElementById("btn-import"),
+    importFile: document.getElementById("import-file")
+  };
+
+  var note = { id: nodeId, text: "", images: [] };
+  var previewOn = false;
+  var saveTimer = null;
+  var hiddenFile = null;
+
+  function setStatus(msg, cls) {
+    el.status.textContent = msg;
+    el.status.className = cls || "";
+  }
+  function statusTimer(msg, cls, ms) {
+    setStatus(msg, cls);
+    if (statusTimer._t) clearTimeout(statusTimer._t);
+    statusTimer._t = setTimeout(function () { setStatus("", ""); }, ms || 2500);
+  }
+
+  function buildImage(im) {
+    var row = document.createElement("div");
+    row.className = "note-img-row";
+    var img = document.createElement("img");
+    img.className = "note-img-thumb";
+    img.src = im.dataUrl;
+    img.alt = im.name || "图片";
+    img.title = "点击放大";
+    img.addEventListener("click", function () {
+      window.open(im.dataUrl, "_blank");
+    });
+    var name = document.createElement("span");
+    name.className = "note-img-name";
+    name.textContent = im.name || ("粘贴图片 " + new Date(im.ts).toLocaleString());
+    var del = document.createElement("button");
+    del.type = "button";
+    del.className = "note-img-del";
+    del.textContent = "删除";
+    del.addEventListener("click", function () {
+      note.images = note.images.filter(function (x) { return x !== im; });
+      renderImages();
+      scheduleSave();
+    });
+    row.appendChild(img);
+    row.appendChild(name);
+    row.appendChild(del);
+    return row;
+  }
+  function renderImages() {
+    el.images.innerHTML = "";
+    note.images.forEach(function (im) { el.images.appendChild(buildImage(im)); });
+  }
+
+  function refreshStats() {
+    var kb = Math.max(1, Math.round(JSON.stringify(note).length / 1024));
+    el.stats.textContent = "已用约 " + kb + " KB（本地存储上限约 5MB，图片过多时可考虑外链或压缩后再粘贴）";
+  }
+
+  // 缩放图片（canvas 最长边 <= IMG_MAX，保持比例）
+  function shrinkImage(dataUrl, max) {
+    return new Promise(function (resolve) {
+      var img = new Image();
+      img.onload = function () {
+        var w = img.width, h = img.height;
+        var scale = 1;
+        if (max && (w > max || h > max)) scale = Math.min(max / w, max / h);
+        if (scale >= 0.999) { resolve(dataUrl); return; }
+        var canvas = document.createElement("canvas");
+        canvas.width = Math.round(w * scale);
+        canvas.height = Math.round(h * scale);
+        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        try {
+          resolve(canvas.toDataURL("image/jpeg", 0.88));
+        } catch (e) {
+          resolve(dataUrl);   // canvas 污染等异常时退回原图
+        }
+      };
+      img.onerror = function () { resolve(dataUrl); };
+      img.src = dataUrl;
+    });
+  }
+
+  function addImageFromDataUrl(dataUrl, name) {
+    if (!dataUrl || dataUrl.indexOf("data:image") !== 0) {
+      statusTimer("未读到有效图片（请先复制一张图片，或使用「插入图片」选择文件）", "err", 4000);
+      return;
+    }
+    shrinkImage(dataUrl, IMG_MAX).then(function (finalUrl) {
+      var im = { id: "img" + Date.now() + "_" + Math.random().toString(36).slice(2, 8), dataUrl: finalUrl, name: name || "", ts: Date.now() };
+      note.images.push(im);
+      renderImages();
+      scheduleSave();
+      statusTimer("图片已插入，记得点「保存」或等待自动保存", "ok");
+    });
+  }
+
+  // 从剪贴板粘贴
+  function pasteFromClipboard() {
+    if (!navigator.clipboard || !navigator.clipboard.read) {
+      statusTimer("当前浏览器不支持读取剪贴板：请复制图片后，点进文本框直接按 Ctrl+V 粘贴", "err", 5000);
+      return;
+    }
+    navigator.clipboard.read().then(function (items) {
+      var found = false;
+      var pending = 0;
+      var done = false;
+      var check = function () {
+        pending--;
+        if (pending <= 0 && !found && !done) {
+          done = true;
+          statusTimer("剪贴板里没有图片", "err");
+        }
+      };
+      items.forEach(function (item) {
+        if (!found && item.types && item.types.some(function (t) { return t.indexOf("image/") === 0; })) {
+          found = true;
+          item.getType(item.types.filter(function (t) { return t.indexOf("image/") === 0; })[0]).then(function (blob) {
+            var fr = new FileReader();
+            fr.onload = function () { addImageFromDataUrl(fr.result, "clipboard"); };
+            fr.readAsDataURL(blob);
+          }).catch(function () { statusTimer("读取剪贴板图片失败", "err"); });
+        } else {
+          pending++;
+          check();
+        }
+      });
+      if (!found && pending === 0) statusTimer("剪贴板里没有图片", "err");
+    }).catch(function () {
+      statusTimer("读取剪贴板被拒绝（可在地址栏授权，或直接 Ctrl+V 粘贴）", "err", 5000);
+    });
+  }
+
+  // 文件选择插入
+  function pickImageFile(file) {
+    if (!file || file.type.indexOf("image/") !== 0) return;
+    var fr = new FileReader();
+    fr.onload = function () { addImageFromDataUrl(fr.result, file.name); };
+    fr.readAsDataURL(file);
+  }
+
+  // LaTeX 预览
+  function togglePreview() {
+    previewOn = !previewOn;
+    if (previewOn) {
+      el.text.style.display = "none";
+      el.preview.classList.add("show");
+      el.preview.innerHTML = "";
+      var div = document.createElement("div");
+      div.textContent = el.text.value;
+      el.preview.appendChild(div);
+      if (window.renderMathInElement) {
+        try {
+          renderMathInElement(el.preview, {
+            delimiters: [
+              { left: "$$", right: "$$", display: true },
+              { left: "$", right: "$", display: false }
+            ],
+            throwOnError: false,
+            errorCallback: function (msg, err) {
+              var span = document.createElement("span");
+              span.className = "latex-error";
+              span.textContent = " [LaTeX 错误: " + msg.replace(/^KaTeX parse error: /, "") + "] ";
+              return span;
+            }
+          });
+        } catch (e) { /* 保留纯文本 */ }
+      }
+      el.latexPreview.textContent = "✏ 返回编辑";
+    } else {
+      el.preview.classList.remove("show");
+      el.preview.innerHTML = "";
+      el.text.style.display = "";
+      el.latexPreview.textContent = "🔍 LaTeX 预览";
+    }
+  }
+
+  // 保存 / 自动保存
+  function persist() {
+    note.text = el.text.value;
+    return window.KGNotes.save(nodeId, note);
+  }
+  function scheduleSave() {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () {
+      saveTimer = null;
+      note.text = el.text.value;
+      window.KGNotes.save(nodeId, note).then(function () {
+        setStatus("已自动保存 " + new Date().toLocaleTimeString(), "ok");
+        statusTimer("已自动保存 " + new Date().toLocaleTimeString(), "ok", 1200);
+        refreshStats();
+      }).catch(function (e) {
+        setStatus("自动保存失败：" + e.message, "err");
+      });
+    }, 1200);
+  }
+  function doSave() {
+    if (JSON.stringify({ text: el.text.value, images: note.images }).length > DB_LIMIT) {
+      setStatus("笔记过大（约 " + Math.round(JSON.stringify({ text: el.text.value, images: note.images }).length / 1024) + " KB），请删除部分图片后再保存", "err");
+      return;
+    }
+    setStatus("保存中…", "saving");
+    persist().then(function () {
+      statusTimer("已保存 " + new Date().toLocaleTimeString(), "ok");
+      refreshStats();
+    }).catch(function (e) {
+      setStatus("保存失败：" + e.message, "err");
+    });
+  }
+
+  // 导出 / 导入
+  function download(filename, text) {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () {
+      URL.revokeObjectURL(a.href);
+      a.parentNode.removeChild(a);
+    }, 500);
+  }
+  function doExportOne() {
+    note.text = el.text.value;
+    var obj = { format: "math-kg-notes", version: 1, exportedAt: new Date().toISOString(), notes: [note] };
+    download("kg-note-" + nodeId + ".json", JSON.stringify(obj, null, 2));
+  }
+  function doExportAll() {
+    window.KGNotes.exportAll().then(function (obj) {
+      download("kg-notes-all-" + new Date().toISOString().slice(0, 10) + ".json", JSON.stringify(obj, null, 2));
+    }).catch(function (e) { setStatus("导出失败：" + e.message, "err"); });
+  }
+  function doImport(file) {
+    var fr = new FileReader();
+    fr.onload = function () {
+      var obj;
+      try { obj = JSON.parse(fr.result); } catch (e) {
+        setStatus("导入失败：不是有效的 JSON 文件", "err");
+        return;
+      }
+      var mode = "merge";
+      if (confirm("导入模式：\n确定 = 合并（只填充空白笔记，不覆盖已有内容）\n取消 = 覆盖（用文件内容替换）")) mode = "merge";
+      else mode = "overwrite";
+      window.KGNotes.importAll(obj, mode).then(function (r) {
+        statusTimer("导入完成，写入 " + r.count + " 条笔记", "ok", 4000);
+        loadNote();
+      }).catch(function (e) {
+        setStatus("导入失败：" + e.message, "err");
+      });
+    };
+    fr.readAsText(file);
+  }
+
+  // 加载当前节点笔记
+  function loadNote() {
+    window.KGNotes.load(nodeId).then(function (saved) {
+      if (saved) {
+        note = {
+          id: nodeId,
+          text: saved.text || "",
+          images: Array.isArray(saved.images) ? saved.images : []
+        };
+        el.text.value = note.text;
+        renderImages();
+        refreshStats();
+        setStatus("已载入本地笔记", "ok");
+        statusTimer("已载入本地笔记", "ok", 1500);
+      } else {
+        note = { id: nodeId, text: "", images: [] };
+        el.text.value = "";
+        renderImages();
+        refreshStats();
+      }
+    }).catch(function () {
+      setStatus("读取本地笔记失败（存储不可用）", "err");
+    });
+  }
+
+  // 事件绑定
+  el.addImg.addEventListener("click", function () {
+    if (!hiddenFile) {
+      hiddenFile = document.createElement("input");
+      hiddenFile.type = "file";
+      hiddenFile.accept = "image/*";
+      hiddenFile.style.display = "none";
+      document.body.appendChild(hiddenFile);
+      hiddenFile.addEventListener("change", function () {
+        if (hiddenFile.files && hiddenFile.files[0]) pickImageFile(hiddenFile.files[0]);
+        hiddenFile.value = "";
+      });
+    }
+    hiddenFile.click();
+  });
+  el.pasteImg.addEventListener("click", pasteFromClipboard);
+  el.latexPreview.addEventListener("click", togglePreview);
+  el.save.addEventListener("click", doSave);
+  el.clear.addEventListener("click", function () {
+    if (!confirm("确定清空本页笔记（文字与图片）？")) return;
+    note.text = "";
+    note.images = [];
+    el.text.value = "";
+    renderImages();
+    refreshStats();
+    window.KGNotes.save(nodeId, note).then(function () { statusTimer("已清空并保存", "ok"); });
+  });
+  el.exportOne.addEventListener("click", doExportOne);
+  el.exportAll.addEventListener("click", doExportAll);
+  el.importBtn.addEventListener("click", function () { el.importFile.click(); });
+  el.importFile.addEventListener("change", function () {
+    if (el.importFile.files && el.importFile.files[0]) doImport(el.importFile.files[0]);
+    el.importFile.value = "";
+  });
+  el.text.addEventListener("input", scheduleSave);
+  // Ctrl+V：若剪贴板带图片则直接插入图片区
+  el.text.addEventListener("paste", function (ev) {
+    var items = (ev.clipboardData || window.clipboardData);
+    if (!items || !items.items) return;
+    var hasImage = false;
+    for (var i = 0; i < items.items.length; i++) {
+      if (items.items[i].type && items.items[i].type.indexOf("image/") === 0) hasImage = true;
+    }
+    if (hasImage) {
+      var first = null;
+      for (var j = 0; j < items.items.length; j++) {
+        var it = items.items[j];
+        if (it.type && it.type.indexOf("image/") === 0) {
+          var blob = it.getAsFile();
+          if (blob) {
+            var fr = new FileReader();
+            fr.onload = function () { addImageFromDataUrl(fr.result, "pasted"); };
+            fr.readAsDataURL(blob);
+            break;
+          }
+        }
+      }
+      ev.preventDefault();  // 图片不进入文字框
+    }
+    // 纯文字粘贴走默认行为，input 事件会触发自动保存
+  });
+
+  loadNote();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+{
+  "name": "propstarmap",
+  "version": "1.0.0",
+  "description": "命题星图 PropStarMap：纯前端、离线可用的数学命题关系图谱。把教材里的定义/命题/定理画成星图，每个命题是一颗星，逻辑关系连成星座。内置拓扑学示例（238 节点），支持复习标注、证明笔记、自定义连接、导入节点、自建学科，双击 index.html 即可运行。",
+  "keywords": [
+    "math",
+    "mathematics",
+    "knowledge-graph",
+    "topology",
+    "cytoscape",
+    "katex",
+    "proposition",
+    "theorem",
+    "offline",
+    "zh-cn"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/bananer648/PropStarMap",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bananer648/PropStarMap.git"
+  },
+  "author": "Bananer",
+  "main": "index.html",
+  "scripts": {
+    "build": "node pack/build.js",
+    "start": "node pack/server.js"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "propstarmap-pack",
+  "private": true,
+  "version": "1.0.0",
+  "description": "命题星图（PropStarMap）打包工具（Node SEA）",
+  "allowScripts": {
+    "postject": true
+  },
+  "dependencies": {
+    "postject": "^1.0.0-alpha.6"
+  }
+}

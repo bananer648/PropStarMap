@@ -1,0 +1,17 @@
+# ============ 构建与打包产物（不进 Git 仓库） ============
+pack/node_modules/
+pack/sea-prep.blob
+pack/*.exe
+site/
+
+# exe 与压缩包（建议放 GitHub Release，不进仓库）
+*.exe
+*.zip
+
+# 本地辅助文件
+*.ps1
+
+# 系统 / 编辑器
+.DS_Store
+Thumbs.db
+desktop.ini
